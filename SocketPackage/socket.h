@@ -1,0 +1,29 @@
+#ifndef _SOCKET_H
+#define _SOCKET_H
+#include <netinet/in.h> // 必须包含这个，否则 sockaddr_in 报错
+/////////////////////////////////////////////
+///////////////////服务器////////////////////
+////////////////////////////////////////////
+// int bindSocket(int lfd,unsigned short port);
+// 绑定＋监听
+int setListen(int lfd, unsigned short port);
+int acceptConn(int lfd, struct sockaddr_in *addr);
+
+/////////////////////////////////////////////
+///////////////////客户端////////////////////
+////////////////////////////////////////////
+int connectToHost(int fd, const char* ip, unsigned short port);
+
+/////////////////////////////////////////////
+///////////////////共  用////////////////////
+////////////////////////////////////////////
+int createSocket();
+
+int writen(int fd,const char* msg,int size);
+int readn(int fd, char* buf, int size);
+
+int sendMsg(int fd, const char* msg, int size);
+int recvMsg(int fd, char** msg);
+int closeSocket(int fd);
+
+#endif
