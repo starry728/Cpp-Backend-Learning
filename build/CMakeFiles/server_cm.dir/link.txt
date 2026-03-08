@@ -1,0 +1,1 @@
+/usr/bin/cc CMakeFiles/server_cm.dir/clientlist.c.o CMakeFiles/server_cm.dir/server.c.o CMakeFiles/server_cm.dir/socket.c.o -o /home/cxy/MySocket/Myapp/server_cm 

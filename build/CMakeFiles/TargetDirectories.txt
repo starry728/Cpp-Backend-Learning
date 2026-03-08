@@ -1,0 +1,4 @@
+/home/cxy/MySocket/build/CMakeFiles/server_cm.dir
+/home/cxy/MySocket/build/CMakeFiles/client_cm.dir
+/home/cxy/MySocket/build/CMakeFiles/edit_cache.dir
+/home/cxy/MySocket/build/CMakeFiles/rebuild_cache.dir
