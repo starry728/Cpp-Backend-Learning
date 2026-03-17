@@ -1,6 +1,71 @@
-*.o
-*.exe
+# ==========================================
+# 1. 编译产物 (Build Artifacts)
+# ==========================================
+*.o                # 目标文件
+*.obj              # Windows 目标文件
+*.a                # 静态库
+*.so               # Linux 动态库
+*.dylib            # macOS 动态库
+*.exe              # Windows 可执行文件
+*.dll              # Windows 动态库
+*.pdb              # Windows 调试符号
+*.ilk              # MSVC 增量链接文件
+
+# 你的可执行文件名 (防止误传)
+db_pool
 main
+test_pool
+server 
+client
+
+# 构建目录
 build/
-.vscode/
-.DS_Store
+cmake-build-debug/
+cmake-build-release/
+bin/
+obj/
+Debug/
+Release/
+
+# ==========================================
+# 2. IDE 与编辑器配置 (IDE Configs)
+# ==========================================
+.vscode/           # VS Code 配置 (你已有的)
+.idea/             # CLion / IntelliJ IDEA 配置
+*.swp              # Vim 交换文件
+*.swo              # Vim 交换文件
+*~                 # Emacs 备份文件
+.project           # Eclipse
+.cproject          # Eclipse
+.settings/         # Eclipse
+
+# ==========================================
+# 3. 操作系统临时文件 (OS Temp Files)
+# ==========================================
+.DS_Store          # macOS 文件夹属性 (你已有的)
+.DS_Store?         # macOS 隐藏文件
+._*                # macOS 资源分叉文件
+Thumbs.db          # Windows 缩略图缓存
+ehthumbs.db        # Windows 缩略图缓存
+Desktop.ini        # Windows 文件夹配置
+
+# ==========================================
+# 4. 敏感信息与日志 (Security & Logs)
+# ==========================================
+# ⚠️ 重要：虽然 dbconf.json 包含配置，但如果里面有密码，建议忽略它
+# 如果你希望别人能直接运行，可以保留 json，但请确保仓库是私有的
+# 或者创建一个 dbconf.json.example 作为模板，忽略真实的 json
+# dbconf.json      
+
+logs/              # 日志目录
+*.log              # 日志文件
+core               # Linux Core Dump 文件
+core.*             # Linux Core Dump 文件
+
+# ==========================================
+# 5. 其他常见垃圾文件
+# ==========================================
+*.tmp
+*.temp
+*.bak
+*.backup
