@@ -1,0 +1,11 @@
+{
+    "ip":"172.31.192.239",
+    "port":3306,
+    "userName":"root",
+    "password":"77520cxy",
+    "dbName":"test1",
+    "minSize":5,
+    "maxSize":20,
+    "maxIdleTime":5000,
+    "timeout":1000
+}
