@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>文件管理 - Web文件管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: #f5f6fa;
+        }
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header h1 { font-size: 20px; }
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        .logout-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+        .breadcrumb {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .breadcrumb a {
+            color: #3498db;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        .breadcrumb a:hover { text-decoration: underline; }
+        .breadcrumb span { margin: 0 5px; color: #7f8c8d; }
+        .file-list {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid #ecf0f1;
+            transition: background 0.2s;
+        }
+        .file-item:hover { background: #f8f9fa; }
+        .file-item:last-child { border-bottom: none; }
+        .file-icon {
+            font-size: 24px;
+            margin-right: 15px;
+            width: 30px;
+            text-align: center;
+        }
+        .file-info { flex: 1; }
+        .file-name {
+            color: #2c3e50;
+            font-weight: 500;
+            cursor: pointer;
+        }
+        .file-name:hover { color: #3498db; }
+        .file-meta {
+            color: #7f8c8d;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+        .file-size {
+            color: #7f8c8d;
+            font-size: 14px;
+            min-width: 80px;
+            text-align: right;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: #e74c3c;
+        }
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+        }
+        .debug-info {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            color: #666;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>📁 Web文件管理系统</h1>
+        <div class="user-info">
+            <span id="username">用户</span>
+            <button class="logout-btn" onclick="logout()">退出登录</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="breadcrumb" id="breadcrumb">
+            <a onclick="loadPath('/')">根目录</a>
+        </div>
+        
+        <!-- 调试信息区域 -->
+        <div class="debug-info" id="debugInfo">
+            页面加载中...
+        </div>
+        
+        <div class="file-list" id="fileList">
+            <div class="loading">正在加载...</div>
+        </div>
+    </div>
+
+    <script>
+    let currentPath = '/';
+    let pathStack = ['/'];
+
+    // 显示调试信息
+    function logDebug(msg) {
+        const debugDiv = document.getElementById('debugInfo');
+        if (debugDiv) {
+            const currentContent = debugDiv.innerHTML;
+            const time = new Date().toLocaleTimeString();
+            debugDiv.innerHTML = currentContent + '\n[' + time + '] ' + msg;
+            debugDiv.scrollTop = debugDiv.scrollHeight;
+        }
+        console.log(msg);
+    }
+
+    // 获取Cookie值
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    }
+
+    // 页面初始化
+    async function init() {
+        logDebug('页面初始化开始...');
+        logDebug('当前URL: ' + window.location.href);
+        
+        // 检查所有Cookie
+        const cookies = document.cookie;
+        logDebug('当前document.cookie: ' + cookies);
+        
+        // 检查是否有username Cookie
+        const username = getCookie('username');
+        if (username) {
+            document.getElementById('username').textContent = username;
+            logDebug('✅ 找到用户名: ' + username);
+        }
+        
+        // 检查是否有session_id
+        const sessionId = getCookie('session_id');
+        if (sessionId) {
+            logDebug('✅ 找到session_id: ' + sessionId.substring(0, 20) + '...');
+        } else {
+            logDebug('❌ 未找到session_id Cookie');
+        }
+        
+        // 尝试直接加载文件列表，让服务器验证Session
+        await loadFiles('/');
+    }
+
+    async function loadFiles(path) {
+        currentPath = path;
+        const listDiv = document.getElementById('fileList');
+        const debugDiv = document.getElementById('debugInfo');
+        
+        // 显示加载中
+        listDiv.innerHTML = '<div class="loading">正在加载文件列表...</div>';
+        
+        // 显示调试信息
+        logDebug('🔍 请求文件列表: /api/files?path=' + encodeURIComponent(path));
+
+        try {
+            const response = await fetch(`/api/files?path=${encodeURIComponent(path)}`, {
+                method: 'GET',
+                credentials: 'include', // 确保发送Cookie
+                headers: {
+                    'Accept': 'application/json',
+                    'Cache-Control': 'no-cache'
+                }
+            });
+            
+            logDebug('📊 响应状态: ' + response.status + ' ' + response.statusText);
+            
+            // 检查是否未登录
+            if (response.status === 403) {
+                logDebug('❌ 403错误：Session验证失败，跳转到登录页面');
+                listDiv.innerHTML = '<div class="error">未登录或会话已过期，正在跳转到登录页面...</div>';
+                setTimeout(() => {
+                    window.location.href = '/index.html';
+                }, 2000);
+                return;
+            }
+            
+            if (response.status === 401) {
+                logDebug('❌ 401错误：未授权');
+                listDiv.innerHTML = '<div class="error">未授权访问，请重新登录...</div>';
+                setTimeout(() => {
+                    window.location.href = '/index.html';
+                }, 2000);
+                return;
+            }
+            
+            if (!response.ok) {
+                throw new Error('HTTP错误: ' + response.status);
+            }
+            
+            const data = await response.json();
+            
+            if (data.error) {
+                logDebug('❌ 服务器返回错误: ' + data.error);
+                listDiv.innerHTML = `<div class="error">服务器错误: ${data.error}</div>`;
+                return;
+            }
+            
+            if (data.success === false) {
+                logDebug('❌ 操作失败: ' + data.message);
+                listDiv.innerHTML = `<div class="error">${data.message}</div>`;
+                return;
+            }
+            
+            // 更新面包屑
+            updateBreadcrumb(path);
+            
+            // 渲染文件列表
+            renderFiles(data);
+            
+        } catch (err) {
+            logDebug('❌ 请求失败: ' + err.message);
+            listDiv.innerHTML = `<div class="error">加载失败: ${err.message}</div>`;
+        }
+    }
+
+    function updateBreadcrumb(path) {
+        const crumb = document.getElementById('breadcrumb');
+        if (path === '/') {
+            crumb.innerHTML = '<a onclick="loadPath(\'/\')">根目录</a>';
+            pathStack = ['/'];
+            return;
+        }
+
+        const parts = path.split('/').filter(p => p);
+        let html = '<a onclick="loadPath(\'/\')">根目录</a>';
+        let buildPath = '';
+        
+        pathStack = ['/'];
+        
+        for (let i = 0; i < parts.length; i++) {
+            buildPath += '/' + parts[i];
+            pathStack.push(buildPath);
+            html += ` <span>/</span> <a onclick="loadPath('${buildPath}')">${parts[i]}</a>`;
+        }
+        
+        crumb.innerHTML = html;
+    }
+
+    function renderFiles(files) {
+        const listDiv = document.getElementById('fileList');
+        
+        if (!Array.isArray(files) || files.length === 0) {
+            listDiv.innerHTML = '<div class="empty">目录为空</div>';
+            logDebug('📁 目录为空');
+            return;
+        }
+
+        // 排序：文件夹在前，文件在后，按名称排序
+        files.sort((a, b) => {
+            if (a.isDir !== b.isDir) return b.isDir - a.isDir;
+            return a.name.localeCompare(b.name, 'zh-CN');
+        });
+
+        let html = '';
+        
+        // 添加返回上级目录（如果不是根目录）
+        if (currentPath !== '/') {
+            const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/')) || '/';
+            html += `
+                <div class="file-item" onclick="loadPath('${parentPath}')">
+                    <div class="file-icon">⬆️</div>
+                    <div class="file-info">
+                        <div class="file-name">返回上级目录</div>
+                    </div>
+                </div>
+            `;
+        }
+
+        for (const file of files) {
+            const icon = file.isDir ? '📁' : getFileIcon(file.name);
+            const size = file.isDir ? '-' : file.sizeHuman;
+            const type = file.isDir ? '文件夹' : file.type;
+            
+            html += `
+                <div class="file-item" onclick="${file.isDir ? `loadPath('${currentPath === '/' ? '' : currentPath}/${encodeURIComponent(file.name)}')` : `downloadFile('${encodeURIComponent(file.name)}')`}">
+                    <div class="file-icon">${icon}</div>
+                    <div class="file-info">
+                        <div class="file-name">${escapeHtml(file.name)}${file.isDir ? '/' : ''}</div>
+                        <div class="file-meta">${type} · ${file.modified}</div>
+                    </div>
+                    <div class="file-size">${size}</div>
+                </div>
+            `;
+        }
+        
+        listDiv.innerHTML = html;
+        logDebug('✅ 渲染了 ' + files.length + ' 个文件/文件夹');
+    }
+
+    function getFileIcon(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const iconMap = {
+            'html': '🌐', 'htm': '🌐', 'css': '🎨', 'js': '📜',
+            'json': '📋', 'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️',
+            'gif': '🖼️', 'pdf': '📄', 'txt': '📝', 'mp4': '🎬',
+            'mp3': '🎵', 'zip': '📦', 'rar': '📦', '7z': '📦',
+            'doc': '📘', 'docx': '📘', 'xls': '📗', 'xlsx': '📗',
+            'ppt': '📙', 'pptx': '📙'
+        };
+        return iconMap[ext] || '📄';
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    function downloadFile(filename) {
+        const encodedFilename = encodeURIComponent(filename);
+        const path = currentPath === '/' ? encodedFilename : `${currentPath}/${encodedFilename}`;
+        window.open(path, '_blank');
+    }
+
+    function loadPath(path) {
+        loadFiles(path);
+    }
+
+    async function logout() {
+        try {
+            await fetch('/api/logout', { 
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+        } catch (e) {
+            console.error('Logout error:', e);
+        }
+        
+        // 清除Cookie并跳转
+        document.cookie = 'session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'username=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        window.location.href = '/index.html';
+    }
+
+    // 页面加载完成后初始化
+    window.onload = init;
+    </script>
+</body>
+</html>

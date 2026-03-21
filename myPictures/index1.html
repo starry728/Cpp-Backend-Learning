@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web服务器 - 文件管理系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+            width: 800px;  /* 加宽以容纳文件列表 */
+            max-width: 95%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 24px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus,
+        input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        button {
+            padding: 12px 24px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+            margin-top: 10px;
+            margin-right: 10px;
+        }
+        
+        button:hover {
+            background: #5568d3;
+        }
+        
+        button.secondary {
+            background: #6c757d;
+        }
+        
+        button.secondary:hover {
+            background: #5a6268;
+        }
+        
+        .toggle {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .toggle a {
+            color: #667eea;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        
+        .toggle a:hover {
+            text-decoration: underline;
+        }
+        
+        .message {
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: none;
+            font-size: 14px;
+        }
+        
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+        
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+        
+        .hidden {
+            display: none !important;
+        }
+        
+        /* 文件浏览器样式 */
+        .file-browser {
+            text-align: left;
+        }
+        
+        .file-browser h2 {
+            color: #333;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .breadcrumb {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .breadcrumb span {
+            cursor: pointer;
+            color: #667eea;
+        }
+        
+        .breadcrumb span:hover {
+            text-decoration: underline;
+        }
+        
+        .file-list {
+            border: 1px solid #e0e0e0;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .file-item {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            border-bottom: 1px solid #e0e0e0;
+            transition: background 0.2s;
+            cursor: pointer;
+        }
+        
+        .file-item:last-child {
+            border-bottom: none;
+        }
+        
+        .file-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .file-icon {
+            font-size: 24px;
+            margin-right: 15px;
+            width: 30px;
+            text-align: center;
+        }
+        
+        .file-info {
+            flex: 1;
+        }
+        
+        .file-name {
+            font-weight: 500;
+            color: #333;
+            margin-bottom: 3px;
+        }
+        
+        .file-meta {
+            font-size: 12px;
+            color: #999;
+        }
+        
+        .file-size {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .user-bar {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .user-info {
+            color: #333;
+            font-size: 14px;
+        }
+        
+        .user-info strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 登录表单 -->
+        <div id="loginForm">
+            <h1>🔐 用户登录</h1>
+            <div id="loginMessage" class="message"></div>
+            <div class="form-group">
+                <label for="loginUsername">用户名</label>
+                <input type="text" id="loginUsername" placeholder="请输入用户名" required>
+            </div>
+            <div class="form-group">
+                <label for="loginPassword">密码</label>
+                <input type="password" id="loginPassword" placeholder="请输入密码" required>
+            </div>
+            <button onclick="handleLogin()">登录</button>
+            <div class="toggle">
+                还没有账号？<a onclick="showRegister()">立即注册</a>
+            </div>
+        </div>
+
+        <!-- 注册表单 -->
+        <div id="registerForm" class="hidden">
+            <h1>📝 用户注册</h1>
+            <div id="registerMessage" class="message"></div>
+            <div class="form-group">
+                <label for="regUsername">用户名</label>
+                <input type="text" id="regUsername" placeholder="3-20位字母数字下划线" required>
+            </div>
+            <div class="form-group">
+                <label for="regPassword">密码</label>
+                <input type="password" id="regPassword" placeholder="6-32位密码" required>
+            </div>
+            <div class="form-group">
+                <label for="regPassword2">确认密码</label>
+                <input type="password" id="regPassword2" placeholder="再次输入密码" required>
+            </div>
+            <button onclick="handleRegister()">注册</button>
+            <div class="toggle">
+                已有账号？<a onclick="showLogin()">立即登录</a>
+            </div>
+        </div>
+
+        <!-- 文件浏览器（登录成功后显示） -->
+        <div id="fileBrowser" class="hidden file-browser">
+            <div class="user-bar">
+                <div class="user-info">
+                    欢迎，<strong id="currentUserName">用户</strong>！
+                </div>
+                <div>
+                    <button onclick="refreshFiles()" style="margin-top: 0; padding: 8px 16px; font-size: 14px;">刷新</button>
+                    <button onclick="logout()" class="secondary" style="margin-top: 0; padding: 8px 16px; font-size: 14px;">退出登录</button>
+                </div>
+            </div>
+            
+            <h2>
+                📁 文件管理
+                <span style="font-size: 14px; color: #999; font-weight: normal;">点击文件夹进入，点击文件下载</span>
+            </h2>
+            
+            <div class="breadcrumb" id="breadcrumb">
+                <span onclick="loadFiles('/')">根目录</span>
+            </div>
+            
+            <div class="file-list" id="fileList">
+                <div class="loading">加载中...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 当前浏览的目录路径
+        let currentPath = '/';
+        
+        // 切换显示登录/注册表单
+        function showRegister() {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.remove('hidden');
+            document.getElementById('fileBrowser').classList.add('hidden');
+            clearMessages();
+        }
+
+        function showLogin() {
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('fileBrowser').classList.add('hidden');
+            clearMessages();
+        }
+
+        function showFileBrowser(username) {
+            document.getElementById('loginForm').classList.add('hidden');
+            document.getElementById('registerForm').classList.add('hidden');
+            document.getElementById('fileBrowser').classList.remove('hidden');
+            document.getElementById('currentUserName').textContent = username;
+            
+            // 加载根目录文件
+            currentPath = '/';
+            loadFiles('/');
+        }
+
+        function clearMessages() {
+            document.getElementById('loginMessage').className = 'message';
+            document.getElementById('loginMessage').style.display = 'none';
+            document.getElementById('registerMessage').className = 'message';
+            document.getElementById('registerMessage').style.display = 'none';
+        }
+
+        function showMessage(form, type, text) {
+            const msgEl = document.getElementById(form + 'Message');
+            msgEl.className = 'message ' + type;
+            msgEl.textContent = text;
+        }
+
+        // 处理注册
+        function handleRegister() {
+            const username = document.getElementById('regUsername').value.trim();
+            const password = document.getElementById('regPassword').value;
+            const password2 = document.getElementById('regPassword2').value;
+
+            // 前端验证
+            if (!username || !password) {
+                showMessage('register', 'error', '用户名和密码不能为空');
+                return;
+            }
+
+            if (!/^[a-zA-Z0-9_]{3,20}$/.test(username)) {
+                showMessage('register', 'error', '用户名格式错误：需3-20位字母数字下划线');
+                return;
+            }
+
+            if (password.length < 6 || password.length > 32) {
+                showMessage('register', 'error', '密码长度需6-32位');
+                return;
+            }
+
+            if (password !== password2) {
+                showMessage('register', 'error', '两次输入的密码不一致');
+                return;
+            }
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/register', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        if (data.success) {
+                            showMessage('register', 'success', '注册成功！即将跳转到登录...');
+                            setTimeout(() => {
+                                showLogin();
+                                document.getElementById('loginUsername').value = username;
+                            }, 1500);
+                        } else {
+                            showMessage('register', 'error', data.message || '注册失败');
+                        }
+                    } catch (e) {
+                        showMessage('register', 'error', '服务器返回格式错误');
+                    }
+                }
+            };
+            
+            xhr.onerror = function() {
+                showMessage('register', 'error', '网络请求失败');
+            };
+            
+            xhr.send(JSON.stringify({ username: username, password: password }));
+        }
+
+        // 处理登录
+        function handleLogin() {
+            const username = document.getElementById('loginUsername').value.trim();
+            const password = document.getElementById('loginPassword').value;
+
+            if (!username || !password) {
+                showMessage('login', 'error', '用户名和密码不能为空');
+                return;
+            }
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', '/api/login', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        if (data.success) {
+                            // 【关键】保存登录状态并跳转到文件浏览器
+                            localStorage.setItem('currentUser', username);
+                            showFileBrowser(username);
+                        } else {
+                            showMessage('login', 'error', data.message || '登录失败');
+                        }
+                    } catch (e) {
+                        showMessage('login', 'error', '服务器返回格式错误');
+                    }
+                }
+            };
+            
+            xhr.onerror = function() {
+                showMessage('login', 'error', '网络请求失败');
+            };
+            
+            xhr.send(JSON.stringify({ username: username, password: password }));
+        }
+
+        // 退出登录
+        function logout() {
+            localStorage.removeItem('currentUser');
+            showLogin();
+            document.getElementById('loginUsername').value = '';
+            document.getElementById('loginPassword').value = '';
+        }
+
+        // 【新增】加载文件列表
+        function loadFiles(path) {
+            currentPath = path;
+            const fileListEl = document.getElementById('fileList');
+            fileListEl.innerHTML = '<div class="loading">加载中...</div>';
+            
+            // 更新面包屑导航
+            updateBreadcrumb(path);
+            
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', '/api/files?path=' + encodeURIComponent(path), true);
+            
+            xhr.onreadystatechange = function() {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        try {
+                            const data = JSON.parse(xhr.responseText);
+                            if (data.success) {
+                                renderFileList(data.files);
+                            } else {
+                                fileListEl.innerHTML = '<div class="loading">加载失败：' + (data.message || '未知错误') + '</div>';
+                            }
+                        } catch (e) {
+                            fileListEl.innerHTML = '<div class="loading">解析数据失败</div>';
+                        }
+                    } else {
+                        fileListEl.innerHTML = '<div class="loading">加载失败（状态码：' + xhr.status + '）</div>';
+                    }
+                }
+            };
+            
+            xhr.onerror = function() {
+                fileListEl.innerHTML = '<div class="loading">网络请求失败</div>';
+            };
+            
+            xhr.send();
+        }
+
+        // 【新增】更新面包屑导航
+        function updateBreadcrumb(path) {
+            const breadcrumbEl = document.getElementById('breadcrumb');
+            if (path === '/') {
+                breadcrumbEl.innerHTML = '<span onclick="loadFiles(\'/\')">根目录</span>';
+                return;
+            }
+            
+            let html = '<span onclick="loadFiles(\'/\')">根目录</span>';
+            const parts = path.split('/').filter(p => p);
+            let currentPath = '';
+            
+            parts.forEach((part, index) => {
+                currentPath += '/' + part;
+                if (index === parts.length - 1) {
+                    html += ' / ' + part;
+                } else {
+                    html += ' / <span onclick="loadFiles(\'' + currentPath + '\')">' + part + '</span>';
+                }
+            });
+            
+            breadcrumbEl.innerHTML = html;
+        }
+
+        // 【新增】渲染文件列表
+        function renderFileList(files) {
+            const fileListEl = document.getElementById('fileList');
+            
+            if (files.length === 0) {
+                fileListEl.innerHTML = '<div class="loading">空文件夹</div>';
+                return;
+            }
+            
+            let html = '';
+            
+            // 添加返回上级目录（如果不是根目录）
+            if (currentPath !== '/') {
+                const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/')) || '/';
+                html += '<div class="file-item" onclick="loadFiles(\'' + parentPath + '\')">';
+                html += '<div class="file-icon">📁</div>';
+                html += '<div class="file-info"><div class="file-name">..</div></div>';
+                html += '</div>';
+            }
+            
+            files.forEach(file => {
+                const isDir = file.isDirectory;
+                const icon = isDir ? '📁' : getFileIcon(file.name);
+                const size = isDir ? '-' : formatFileSize(file.size);
+                
+                html += '<div class="file-item" onclick="handleFileClick(\'' + file.name + '\', ' + isDir + ')">';
+                html += '<div class="file-icon">' + icon + '</div>';
+                html += '<div class="file-info">';
+                html += '<div class="file-name">' + file.name + '</div>';
+                html += '<div class="file-meta">' + file.modified + '</div>';
+                html += '</div>';
+                html += '<div class="file-size">' + size + '</div>';
+                html += '</div>';
+            });
+            
+            fileListEl.innerHTML = html;
+        }
+
+        // 【新增】获取文件图标
+        function getFileIcon(filename) {
+            const ext = filename.split('.').pop().toLowerCase();
+            const icons = {
+                'jpg': '🖼️', 'jpeg': '🖼️', 'png': '🖼️', 'gif': '🖼️',
+                'mp4': '🎬', 'avi': '🎬', 'mkv': '🎬',
+                'mp3': '🎵', 'wav': '🎵', 'flac': '🎵',
+                'pdf': '📄', 'doc': '📄', 'docx': '📄',
+                'txt': '📝', 'md': '📝',
+                'zip': '📦', 'rar': '📦', '7z': '📦',
+                'exe': '⚙️', 'sh': '⚙️',
+                'html': '🌐', 'css': '🎨', 'js': '📜'
+            };
+            return icons[ext] || '📄';
+        }
+
+        // 【新增】格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        // 【新增】处理文件点击
+        function handleFileClick(name, isDir) {
+            if (isDir) {
+                // 进入目录
+                const newPath = currentPath === '/' ? '/' + name : currentPath + '/' + name;
+                loadFiles(newPath);
+            } else {
+                // 下载文件
+                const filePath = currentPath === '/' ? '/' + name : currentPath + '/' + name;
+                window.open(filePath, '_blank');
+            }
+        }
+
+        // 【新增】刷新文件列表
+        function refreshFiles() {
+            loadFiles(currentPath);
+        }
+
+        // 页面加载时检查登录状态
+        window.onload = function() {
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                showFileBrowser(savedUser);
+            }
+        };
+    </script>
+</body>
+</html>

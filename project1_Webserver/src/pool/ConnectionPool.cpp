@@ -4,6 +4,7 @@
 #include <thread>
 #include <atomic>
 #include <iostream>
+#include <cstdlib>  // 新增：包含 getenv 函数
 
 using namespace std;
 using namespace Json;
@@ -62,9 +63,38 @@ ConnectionPool::~ConnectionPool()
 
 bool ConnectionPool::parseJsonFile()
 {
-    ifstream ifs("dbconf.json");
+    // 【关键修改】尝试多个可能的配置文件路径
+    vector<string> possiblePaths = {
+        "dbconf.json",                 // 当前目录
+        "../dbconf.json",              // 上一级目录
+        "../../dbconf.json",           // 上两级目录
+    };
+    
+    // 添加环境变量指定的路径
+    const char* webRoot = getenv("WEB_ROOT");
+    if (webRoot) {
+        possiblePaths.push_back(string(webRoot) + "/dbconf.json");
+        possiblePaths.push_back(string(webRoot) + "/../dbconf.json");
+    }
+    
+    ifstream ifs;
+    string configPath;
+    
+    // 尝试所有可能的路径
+    for (const auto& path : possiblePaths) {
+        ifs.open(path);
+        if (ifs.is_open()) {
+            configPath = path;
+            cout << "[ConnectionPool] 找到配置文件: " << path << endl;
+            break;
+        }
+    }
+    
     if (!ifs.is_open()) {
-        cout << "dbconf.json open failed" << endl;
+        cerr << "[ConnectionPool] dbconf.json 打开失败，尝试了以下路径:" << endl;
+        for (const auto& path : possiblePaths) {
+            cerr << "  " << path << endl;
+        }
         return false;
     }
 
@@ -75,14 +105,7 @@ bool ConnectionPool::parseJsonFile()
     string errs;
     Json::Value root;
 
-    // 3. 构建 Reader 对象 (这是正确的调用方式：builder.newCharReader())
-    // 注意：newCharReader 返回一个指针，需要手动 delete，或者用 unique_ptr 管理
-    // 但 jsoncpp 提供了一个更简单的辅助函数 parseFromStream，我们直接用那个更稳妥
-    // 如果一定要用 newCharReader，写法是：
-    // std::unique_ptr<Json::CharReader> reader(builder.newCharReader());
-    // if (!reader->parse(ifs, &root, &errs)) ...
-    
-    // 【推荐写法】直接使用 parseFromStream，它内部会处理 reader 的创建和销毁
+    // 3. 使用 parseFromStream
     if (!Json::parseFromStream(builder, ifs, &root, &errs)) {
         cout << "JSON parse error: " << errs << endl;
         return false;
@@ -99,6 +122,13 @@ bool ConnectionPool::parseJsonFile()
         m_maxSize = root["maxSize"].asInt();
         m_maxIdleTime = root["maxIdleTime"].asInt();
         m_timeout = root["timeout"].asInt();
+        
+        cout << "[ConnectionPool] 数据库配置加载成功:" << endl;
+        cout << "  IP: " << m_ip << ":" << m_port << endl;
+        cout << "  数据库: " << m_dbName << endl;
+        cout << "  用户: " << m_user << endl;
+        cout << "  连接池: " << m_minSize << " ~ " << m_maxSize << endl;
+        
         return true;
     }
     
@@ -155,7 +185,7 @@ void ConnectionPool::recycleConnection()
         unique_lock<mutex> locker(m_mutexQ);
         
         // 只有当空闲连接数多于最小连接数时，才考虑回收
-        while (m_connectionQ.size() > m_minSize && m_isRunning)
+        while (static_cast<int>(m_connectionQ.size()) > m_minSize && m_isRunning)
         {
             MysqlConn* conn = m_connectionQ.front();
             
@@ -219,11 +249,6 @@ shared_ptr<MysqlConn> ConnectionPool::getConnection()
 
     MysqlConn* conn = m_connectionQ.front();
     m_connectionQ.pop();
-    
-    // 通知生产者（如果有线程因为满员在等待，虽然现在不太可能，因为刚 pop 了一个）
-    // 主要是通知可能存在的其他等待获取连接的线程（虽然它们还在 while 里）
-    // 其实这里不需要 notify，因为只是减少了一个空闲连接，不会唤醒生产者（生产者只在满员时睡）
-    // 但为了唤醒可能存在的其他逻辑，保留 notify 也无妨，或者仅在生产/回收时 notify
     
     // 构造 shared_ptr，绑定自定义删除器
     // 捕获 this 指针有风险：如果池子析构了，shared_ptr 还没释放怎么办？

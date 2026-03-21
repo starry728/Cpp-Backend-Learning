@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>登录 - Web文件管理系统</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .login-container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            width: 100%;
+            max-width: 400px;
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            color: #555;
+            font-size: 14px;
+        }
+        input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #5568d3;
+        }
+        .links {
+            text-align: center;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        a {
+            color: #667eea;
+            text-decoration: none;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .error {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
+            display: none;
+        }
+        .success {
+            color: #27ae60;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <h2>🔐 用户登录</h2>
+        <form id="loginForm">
+            <div class="form-group">
+                <label for="username">用户名</label>
+                <input type="text" id="username" name="username" required 
+                       placeholder="请输入用户名" minlength="3" maxlength="20">
+            </div>
+            <div class="form-group">
+                <label for="password">密码</label>
+                <input type="password" id="password" name="password" required 
+                       placeholder="请输入密码" minlength="6">
+            </div>
+            <button type="submit">登录</button>
+            <div id="error" class="error"></div>
+            <div id="success" class="success"></div>
+        </form>
+        <div class="links">
+            还没有账号？<a href="/register.html">立即注册</a>
+        </div>
+    </div>
+
+    <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errorDiv = document.getElementById('error');
+        const successDiv = document.getElementById('success');
+        errorDiv.style.display = 'none';
+        successDiv.style.display = 'none';
+
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+
+        try {
+            const response = await fetch('/api/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: `username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`,
+                credentials: 'include'  // 确保发送Cookie
+            });
+
+            const data = await response.json();
+            
+            console.log('登录响应:', data);
+            console.log('响应状态:', response.status);
+            console.log('响应头:', response.headers);
+
+            if (data.success) {
+                successDiv.textContent = '登录成功！正在跳转...';
+                successDiv.style.display = 'block';
+                
+                // 等待一小段时间让浏览器保存Cookie
+                await new Promise(resolve => setTimeout(resolve, 100));
+                
+                // 强制刷新页面以确保使用新的Cookie
+                window.location.href = '/files.html';
+            } else {
+                errorDiv.textContent = data.message || '登录失败';
+                errorDiv.style.display = 'block';
+            }
+        } catch (err) {
+            errorDiv.textContent = '网络错误，请稍后重试';
+            errorDiv.style.display = 'block';
+            console.error('登录错误:', err);
+        }
+    });
+    </script>
+</body>
+</html>
